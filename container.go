@@ -41,9 +41,11 @@ type container struct {
 
 	graceTime  time.Duration
 	graceTimeL sync.RWMutex
+
+	privileged bool
 }
 
-func (backend *Backend) newContainer(spec garden.ContainerSpec, id string) (*container, error) {
+func (backend *Backend) newContainer(spec garden.ContainerSpec, id string, privileged bool) (*container, error) {
 	var workDir string
 	var hasRootfs bool
 	if spec.RootFSPath != "" {
@@ -86,6 +88,8 @@ func (backend *Backend) newContainer(spec garden.ContainerSpec, id string) (*con
 		env: spec.Env,
 
 		processTracker: process.NewTracker(),
+
+		privileged: privileged,
 	}, nil
 }
 

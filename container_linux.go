@@ -11,7 +11,7 @@ import (
 	"code.cloudfoundry.org/garden"
 )
 
-func (container *container) setup() error {
+func (container *container) setupPrivileged() error {
 	if container.hasRootfs {
 		for _, dir := range []string{"/proc", "/dev", "/sys"} {
 			dest := filepath.Join(container.workDir, dir)
@@ -69,49 +69,7 @@ func (container *container) setup() error {
 	return nil
 }
 
-const defaultRootPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-// const defaultPath = "/usr/local/bin:/usr/bin:/bin"
-
-func (container *container) path() string {
-	var path string
-	for _, env := range container.env {
-		segs := strings.SplitN(env, "=", 2)
-		if len(segs) < 2 {
-			continue
-		}
-
-		if segs[0] == "PATH" {
-			path = segs[1]
-		}
-	}
-
-	if !container.hasRootfs {
-		if path == "" {
-			path = os.Getenv("PATH")
-		}
-
-		return path
-	}
-
-	if path == "" {
-		// assume running as root for now, since Houdini doesn't currently support
-		// running as a user
-		path = defaultRootPath
-	}
-
-	var scopedPath string
-	for _, dir := range filepath.SplitList(path) {
-		if scopedPath != "" {
-			scopedPath += string(filepath.ListSeparator)
-		}
-
-		scopedPath += container.workDir + dir
-	}
-
-	return scopedPath
-}
-
-func (container *container) cmd(spec garden.ProcessSpec) (*exec.Cmd, error) {
+func (container *container) cmdPrivileged(spec garden.ProcessSpec) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 
 	if container.hasRootfs {
@@ -150,39 +108,4 @@ func (container *container) cmd(spec garden.ProcessSpec) (*exec.Cmd, error) {
 	cmd.Env = append(os.Environ(), append(container.env, spec.Env...)...)
 
 	return cmd, nil
-}
-
-func findExecutable(file string) error {
-	d, err := os.Stat(file)
-	if err != nil {
-		return err
-	}
-	if m := d.Mode(); !m.IsDir() && m&0111 != 0 {
-		return nil
-	}
-	return os.ErrPermission
-}
-
-// based on exec.LookPath from stdlib
-func lookPath(file string, path string) (string, error) {
-	if strings.Contains(file, "/") {
-		err := findExecutable(file)
-		if err == nil {
-			return file, nil
-		}
-		return "", &exec.Error{Name: file, Err: err}
-	}
-
-	for _, dir := range filepath.SplitList(path) {
-		if dir == "" {
-			// Unix shell semantics: path element "" means "."
-			dir = "."
-		}
-		path := filepath.Join(dir, file)
-		if err := findExecutable(path); err == nil {
-			return path, nil
-		}
-	}
-
-	return "", &exec.Error{Name: file, Err: exec.ErrNotFound}
 }

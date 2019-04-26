@@ -17,15 +17,19 @@ type Backend struct {
 	containersL sync.RWMutex
 
 	containerNum uint32
+
+	privileged bool
 }
 
-func NewBackend(containersDir string) *Backend {
+func NewBackend(containersDir string, privileged bool) *Backend {
 	return &Backend{
 		containersDir: containersDir,
 
 		containers: make(map[string]*container),
 
 		containerNum: uint32(time.Now().UnixNano()),
+
+		privileged: privileged,
 	}
 }
 
@@ -61,7 +65,7 @@ func (backend *Backend) Create(spec garden.ContainerSpec) (garden.Container, err
 		spec.Handle = id
 	}
 
-	container, err := backend.newContainer(spec, id)
+	container, err := backend.newContainer(spec, id, backend.privileged)
 	if err != nil {
 		return nil, err
 	}
